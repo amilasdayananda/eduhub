@@ -1,45 +1,55 @@
-import time
-import requests
-import sqlite3
 import os
+import requests
+from bs4 import BeautifulSoup
 from flask import Flask, render_template, request, jsonify
-from duckduckgo_search import DDGS
 
 app = Flask(__name__)
 
-# Render-safe Database Path
-DB_PATH = '/opt/render/project/src/favorites.db' if os.path.exists('/opt/render/project/src/') else 'favorites.db'
+def stealth_search(query):
+    """Direct Lite Search - Bypasses blocks and works on Render/Namecheap."""
+    # Force search for specific educational filetypes
+    search_q = f"{query} filetype:pdf OR filetype:xlsx OR filetype:docx"
+    url = f"https://html.duckduckgo.com/html/?q={search_q}"
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+    }
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute('CREATE TABLE IF NOT EXISTS favs (id INTEGER PRIMARY KEY, title TEXT, url TEXT, type TEXT)')
-    conn.close()
-
-init_db()
-
-def search_logic(query):
     results = []
-    # 1. PRIMARY: DuckDuckGo
     try:
-        with DDGS() as ddgs:
-            # We force it to find documents
-            q = f"{query} (filetype:pdf OR filetype:xlsx OR filetype:docx)"
-            ddgs_res = ddgs.text(q, backend="lite", max_results=15)
-            for r in ddgs_res:
-                link = r['href'].lower()
-                ftype = 'pdf' if '.pdf' in link else ('excel' if '.xls' in link else 'doc')
-                results.append({"title": r['title'], "url": r['href'], "snippet": r['body'], "file_type": ftype, "source": "Global"})
-    except Exception as e:
-        print(f"DDG Error: {e}")
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200: return []
 
-    # 2. BACKUP: Wikipedia (Always works)
-    if not results:
-        try:
-            wiki = requests.get(f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query}&limit=5&format=json").json()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        
+        # Extracting results from DDG Lite HTML structure
+        for link in soup.find_all('a', class_='result__a', limit=15):
+            title = link.text
+            href = link['href']
+            
+            # Detect Type
+            ftype = 'web'
+            if '.pdf' in href.lower(): ftype = 'pdf'
+            elif '.xls' in href.lower(): ftype = 'excel'
+            elif '.doc' in href.lower(): ftype = 'doc'
+
+            results.append({
+                "title": title,
+                "url": href,
+                "file_type": ftype,
+                "snippet": "Educational resource found in global archives."
+            })
+        
+        # Fallback to Wikipedia if web search is dry
+        if not results:
+            wiki = requests.get(f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query}&limit=3&format=json").json()
             for i in range(len(wiki[1])):
-                results.append({"title": wiki[1][i], "url": wiki[3][i], "snippet": "Educational summary from archives.", "file_type": "web", "source": "Wiki"})
-        except: pass
-    return results
+                results.append({"title": wiki[1][i], "url": wiki[3][i], "file_type": "web", "snippet": "Wiki Summary"})
+
+        return results
+    except:
+        return []
 
 @app.route('/')
 def index():
@@ -48,23 +58,7 @@ def index():
 @app.route('/api/search')
 def api_search():
     q = request.args.get('q', '').strip()
-    return jsonify(search_logic(q)) if q else jsonify([])
-
-@app.route('/api/save', methods=['POST'])
-def save_fav():
-    data = request.json
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("INSERT INTO favs (title, url, type) VALUES (?, ?, ?)", (data['title'], data['url'], data['type']))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "saved"})
-
-@app.route('/api/get_favs')
-def get_favs():
-    conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute("SELECT * FROM favs").fetchall()
-    conn.close()
-    return jsonify([{"title": r[1], "url": r[2], "type": r[3]} for r in rows])
+    return jsonify(stealth_search(q))
 
 if __name__ == '__main__':
     app.run(debug=True)
