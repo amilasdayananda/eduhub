@@ -1,55 +1,53 @@
-import os
 import requests
-from bs4 import BeautifulSoup
+import sqlite3
+import os
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
-def stealth_search(query):
-    """Direct Lite Search - Bypasses blocks and works on Render/Namecheap."""
-    # Force search for specific educational filetypes
-    search_q = f"{query} filetype:pdf OR filetype:xlsx OR filetype:docx"
-    url = f"https://html.duckduckgo.com/html/?q={search_q}"
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-    }
+# Database for Favorites
+DB_PATH = 'favorites.db'
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('CREATE TABLE IF NOT EXISTS favs (id INTEGER PRIMARY KEY, title TEXT, url TEXT, type TEXT)')
+init_db()
 
+def get_edu_resources(query):
     results = []
+    
+    # SOURCE 1: Internet Archive (Direct PDF & Document Search)
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code != 200: return []
-
-        soup = BeautifulSoup(resp.text, 'html.parser')
+        # Search for PDFs and Documents specifically
+        archive_url = f"https://archive.org/advancedsearch.php?q={query}+AND+mediatype:(texts)&fl[]=title,identifier,format&output=json&rows=10"
+        archive_data = requests.get(archive_url, timeout=5).json()
         
-        # Extracting results from DDG Lite HTML structure
-        for link in soup.find_all('a', class_='result__a', limit=15):
-            title = link.text
-            href = link['href']
-            
-            # Detect Type
-            ftype = 'web'
-            if '.pdf' in href.lower(): ftype = 'pdf'
-            elif '.xls' in href.lower(): ftype = 'excel'
-            elif '.doc' in href.lower(): ftype = 'doc'
-
+        for item in archive_data.get('response', {}).get('docs', []):
+            identifier = item.get('identifier')
+            # Create a direct link to the document
             results.append({
-                "title": title,
-                "url": href,
-                "file_type": ftype,
-                "snippet": "Educational resource found in global archives."
+                "title": item.get('title', 'Educational Document'),
+                "url": f"https://archive.org/details/{identifier}",
+                "snippet": f"Full text archive resource from Internet Archive.",
+                "file_type": "pdf", # Archive is mostly PDF/Text
+                "source": "Archive.org"
             })
-        
-        # Fallback to Wikipedia if web search is dry
-        if not results:
-            wiki = requests.get(f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query}&limit=3&format=json").json()
-            for i in range(len(wiki[1])):
-                results.append({"title": wiki[1][i], "url": wiki[3][i], "file_type": "web", "snippet": "Wiki Summary"})
+    except: pass
 
-        return results
-    except:
-        return []
+    # SOURCE 2: Wikipedia API (High Reliability fallback)
+    try:
+        wiki_url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query}&limit=5&format=json"
+        wiki_data = requests.get(wiki_url, timeout=5).json()
+        for i in range(len(wiki_data[1])):
+            results.append({
+                "title": wiki_data[1][i],
+                "url": wiki_data[3][i],
+                "snippet": "Verified educational summary and references.",
+                "file_type": "web",
+                "source": "Wikipedia"
+            })
+    except: pass
+
+    return results
 
 @app.route('/')
 def index():
@@ -58,7 +56,15 @@ def index():
 @app.route('/api/search')
 def api_search():
     q = request.args.get('q', '').strip()
-    return jsonify(stealth_search(q))
+    if not q: return jsonify([])
+    return jsonify(get_edu_resources(q))
+
+@app.route('/api/save', methods=['POST'])
+def save_fav():
+    data = request.json
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("INSERT INTO favs (title, url, type) VALUES (?, ?, ?)", (data['title'], data['url'], data['type']))
+    return jsonify({"status": "saved"})
 
 if __name__ == '__main__':
     app.run(debug=True)
