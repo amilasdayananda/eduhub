@@ -4,44 +4,47 @@ from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
-# --- API ORCHESTRATOR ---
-
-def get_archive_data(query, level):
-    """Fetches PDF, Excel, and Word from Archive.org"""
+def get_archive_materials(query, level):
+    """
+    Searches Archive.org specifically for Office and PDF formats.
+    """
     results = []
-    # Adjust query based on level
-    level_query = "intro" if level == "Beginner" else "advanced"
-    q = f"{query} {level_query}"
+    # Refine query based on student level
+    search_term = f"{query} {level}"
     
-    url = f"https://archive.org/advancedsearch.php?q={q}&fl[]=title,identifier,format&output=json&rows=10"
+    # We ask for specific formats in the Archive.org query
+    url = f"https://archive.org/advancedsearch.php?q={search_term}&fl[]=title,identifier,format&output=json&rows=15"
+    
     try:
-        data = requests.get(url, timeout=5).json()
-        for item in data.get('response', {}).get('docs', []):
-            fmt = str(item.get('format', '')).lower()
-            ftype = 'pdf'
-            if 'excel' in fmt or 'xls' in fmt: ftype = 'excel'
-            elif 'word' in fmt or 'doc' in fmt: ftype = 'doc'
+        response = requests.get(url, timeout=5).json()
+        docs = response.get('response', {}).get('docs', [])
+        
+        for item in docs:
+            # Archive stores multiple formats in a list or string
+            formats = str(item.get('format', '')).lower()
             
+            # Map formats to our dashboard icons
+            ftype = 'web'
+            if 'pdf' in formats: ftype = 'pdf'
+            elif 'excel' in formats or 'xlsx' in formats: ftype = 'excel'
+            elif 'word' in formats or 'docx' in formats: ftype = 'doc'
+            elif 'powerpoint' in formats or 'pptx' in formats: ftype = 'ppt'
+
             results.append({
-                "title": item.get('title', 'Document'),
+                "title": item.get('title', 'Educational Resource'),
                 "url": f"https://archive.org/details/{item['identifier']}",
                 "type": ftype,
-                "level": level
+                "level": level,
+                "source": "Internet Archive"
             })
-    except: pass
+    except:
+        pass
     return results
 
-def get_video_data(query, level):
-    """Fetches Videos from Youtube (via open API)"""
-    results = []
-    q = f"{query} {level} tutorial"
-    url = f"https://www.googleapis.com/customsearch/v1?q={q}&key=YOUR_KEY&cx=YOUR_CX" 
-    # Fallback: Using Wikipedia's video search or similar open endpoints
-    # For this demo, we use a reliable web-search fallback for videos
-    return results
-
-def get_web_data(query, level):
-    """Fetches Articles from Wikipedia"""
+def get_web_articles(query, level):
+    """
+    Fetches high-quality web pages from Wikipedia.
+    """
     results = []
     url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query} {level}&limit=5&format=json"
     try:
@@ -51,9 +54,11 @@ def get_web_data(query, level):
                 "title": data[1][i],
                 "url": data[3][i],
                 "type": "web",
-                "level": level
+                "level": level,
+                "source": "Wikipedia"
             })
-    except: pass
+    except:
+        pass
     return results
 
 @app.route('/api/search')
@@ -62,14 +67,15 @@ def api_search():
     level = request.args.get('level', 'Beginner')
     if not query: return jsonify([])
 
-    # Run all searches at once for "Anti-Gravity" speed
+    # Run searches in parallel for "Anti-Gravity" speed
     with ThreadPoolExecutor() as executor:
-        f1 = executor.submit(get_archive_data, query, level)
-        f2 = executor.submit(get_web_data, query, level)
+        f1 = executor.submit(get_archive_materials, query, level)
+        f2 = executor.submit(get_web_articles, query, level)
         
-        all_results = f1.result() + f2.result()
+        # Combine everything
+        combined = f1.result() + f2.result()
     
-    return jsonify(all_results)
+    return jsonify(combined)
 
 @app.route('/')
 def index():
