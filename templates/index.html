@@ -2,66 +2,50 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduHub | Anti-Gravity Search</title>
+    <title>EduHub | Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
         :root { --accent: #4f46e5; }
-        body { background: #f8fafc; font-family: 'Inter', sans-serif; color: #1e293b; }
+        body { background: #fdfdfd; font-family: 'Inter', sans-serif; }
+        .hero { background: white; padding: 60px 0; border-bottom: 1px solid #eee; text-align: center; }
+        .search-pill { max-width: 600px; margin: -30px auto 0; background: white; border-radius: 50px; padding: 12px 25px; border: 1px solid #ddd; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .search-pill input { border: none; outline: none; width: 100%; font-size: 1.1rem; }
         
-        .hero { background: white; padding: 80px 0 60px; border-bottom: 1px solid #e2e8f0; text-align: center; }
-        .search-container {
-            max-width: 650px; margin: -35px auto 0; background: white; 
-            border-radius: 50px; padding: 12px 30px; border: 1px solid #cbd5e1;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.06); transition: 0.3s;
-        }
-        .search-container:focus-within { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 15px 50px rgba(79, 70, 229, 0.12); }
-        .search-container input { border: none; outline: none; width: 100%; font-size: 1.1rem; }
-
-        #status { display: none; text-align: center; margin-top: 40px; }
-        .res-card { 
-            background: white; border-radius: 20px; border: 1px solid #f1f5f9;
-            padding: 24px; height: 100%; transition: 0.4s ease;
-        }
-        .res-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.05); border-color: var(--accent); }
+        .res-card { background: white; border-radius: 20px; border: 1px solid #f0f0f0; padding: 20px; height: 100%; transition: 0.3s; }
+        .res-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.05); }
         
-        /* Modal for All Formats */
-        .modal-xl { max-width: 95%; }
-        iframe { width: 100%; height: 82vh; border: none; border-radius: 12px; }
+        /* Favorites Sidebar */
+        .offcanvas { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); }
+        .fav-item { border-bottom: 1px solid #eee; padding: 10px 0; }
         
-        .icon-box { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 20px; }
-        .type-pdf { background: #fef2f2; color: #ef4444; }
-        .type-excel { background: #f0fdf4; color: #22c55e; }
-        .type-doc { background: #eff6ff; color: #3b82f6; }
+        iframe { width: 100%; height: 80vh; border-radius: 12px; border: none; }
     </style>
 </head>
 <body>
 
 <div class="hero">
-    <h1 class="fw-bold display-4">EduHub.</h1>
-    <p class="lead text-muted">Analyzing global databases for study materials.</p>
-</div>
-
-<div class="container">
-    <div class="search-container d-flex align-items-center">
+    <h1 class="fw-bold">EduHub. <span class="badge bg-primary fs-6">Pro</span></h1>
+    <div class="search-pill d-flex align-items-center">
         <i class="bi bi-search me-2 text-muted"></i>
-        <input type="text" id="qInput" placeholder="Search (e.g. 'Accounting Notes PDF' or 'SQL Excel')">
+        <input type="text" id="qInput" placeholder="Search (e.g. 'Business Law PDF')">
+        <button class="btn btn-sm btn-dark rounded-pill ms-2" data-bs-toggle="offcanvas" data-bs-target="#favSide" onclick="loadFavs()">
+            <i class="bi bi-heart-fill me-1"></i> Saved
+        </button>
     </div>
-
-    <div id="status">
-        <div class="spinner-grow text-primary spinner-grow-sm mb-2"></div>
-        <p class="text-muted small">Bypassing security & searching global archives...</p>
-        <div class="progress container p-0" style="max-width: 400px; height: 4px;"><div id="pBar" class="progress-bar" style="width: 0%"></div></div>
-    </div>
-
-    <div id="grid" class="row g-4 mt-5"></div>
 </div>
 
-<div class="modal fade" id="vModal" tabindex="-1">
+<div class="container mt-5"><div id="grid" class="row g-4"></div></div>
+
+<div class="offcanvas offcanvas-end" id="favSide">
+    <div class="offcanvas-header"><h5 class="fw-bold">My Favorites</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button></div>
+    <div class="offcanvas-body" id="favList"></div>
+</div>
+
+<div class="modal fade" id="pModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
-            <div class="modal-header"><h6 class="modal-title fw-bold" id="vTitle">Document Preview</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h6 class="modal-title fw-bold" id="vTitle"></h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body p-0"><iframe id="vFrame" src=""></iframe></div>
         </div>
     </div>
@@ -71,60 +55,49 @@
 <script>
 const input = document.getElementById('qInput');
 const grid = document.getElementById('grid');
-const status = document.getElementById('status');
-const pBar = document.getElementById('pBar');
-const vModal = new bootstrap.Modal(document.getElementById('vModal'));
+const vModal = new bootstrap.Modal(document.getElementById('pModal'));
 
-const iconMap = {'pdf': 'bi-file-earmark-pdf', 'excel': 'bi-file-earmark-spreadsheet', 'doc': 'bi-file-earmark-word'};
-
-input.addEventListener('input', (e) => {
+input.addEventListener('input', async (e) => {
     const q = e.target.value.trim();
-    if (q.length < 3) { grid.innerHTML = ''; status.style.display = 'none'; return; }
-
-    clearTimeout(window.sTimer);
-    window.sTimer = setTimeout(async () => {
-        status.style.display = 'block';
-        pBar.style.width = '30%';
-        grid.innerHTML = '';
-
-        try {
-            const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-            const data = await res.json();
-            
-            pBar.style.width = '100%';
-            setTimeout(() => status.style.display = 'none', 400);
-
-            if (data.length === 0) {
-                grid.innerHTML = '<div class="col-12 text-center py-5"><h5>No files found. Try adding "PDF" to your search.</h5></div>';
-                return;
-            }
-
-            grid.innerHTML = data.map(item => `
-                <div class="col-md-6 col-lg-4">
-                    <div class="res-card">
-                        <div class="icon-box type-${item.file_type}">
-                            <i class="bi ${iconMap[item.file_type] || 'bi-globe'}"></i>
-                        </div>
-                        <h6 class="fw-bold mb-1">${item.title}</h6>
-                        <p class="small text-muted mb-4" style="height: 40px; overflow: hidden;">${item.snippet}</p>
-                        <div class="d-flex gap-2">
-                            <button onclick="view('${item.url}', '${item.file_type}', '${item.title.replace(/'/g, "")}')" class="btn btn-primary btn-sm rounded-pill w-100">Quick Preview</button>
-                            <a href="${item.url}" target="_blank" class="btn btn-outline-secondary btn-sm rounded-circle"><i class="bi bi-download"></i></a>
-                        </div>
-                    </div>
+    if (q.length < 3) return;
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    grid.innerHTML = data.map(item => `
+        <div class="col-md-6 col-lg-4">
+            <div class="res-card shadow-sm">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="badge bg-light text-dark border text-uppercase">${item.file_type}</span>
+                    <button class="btn btn-sm" onclick="saveFav('${item.title}', '${item.url}', '${item.file_type}')"><i class="bi bi-heart text-danger"></i></button>
                 </div>
-            `).join('');
-
-        } catch (err) { status.style.display = 'none'; }
-    }, 800);
+                <h6 class="fw-bold mb-1">${item.title}</h6>
+                <p class="small text-muted mb-4">${item.source}</p>
+                <div class="d-flex gap-2">
+                    <button onclick="preview('${item.url}', '${item.file_type}', '${item.title.replace(/'/g, "")}')" class="btn btn-primary btn-sm rounded-pill w-100">Quick Preview</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
 });
 
-function view(url, type, title) {
+async function saveFav(title, url, type) {
+    await fetch('/api/save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, url, type})});
+    alert("Saved!");
+}
+
+async function loadFavs() {
+    const res = await fetch('/api/get_favs');
+    const data = await res.json();
+    document.getElementById('favList').innerHTML = data.map(f => `
+        <div class="fav-item">
+            <p class="mb-1 fw-bold small">${f.title}</p>
+            <a href="${f.url}" target="_blank" class="btn btn-sm btn-link p-0 text-decoration-none">Open Link</a>
+        </div>
+    `).join('');
+}
+
+function preview(url, type, title) {
     document.getElementById('vTitle').innerText = title;
-    let vUrl = type === 'pdf' ? 
-               `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true` : 
-               `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`;
-    document.getElementById('vFrame').src = vUrl;
+    document.getElementById('vFrame').src = type === 'pdf' ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true` : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`;
     vModal.show();
 }
 </script>
