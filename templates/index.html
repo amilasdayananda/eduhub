@@ -7,51 +7,49 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
         :root { --accent: #4f46e5; }
-        body { background: #f1f5f9; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: #f8fafc; font-family: 'Inter', sans-serif; }
         
-        /* Glass Navbar */
-        .search-bar-fixed {
-            position: sticky; top: 0; background: rgba(255,255,255,0.8);
-            backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0;
+        .sticky-search {
+            position: sticky; top: 0; background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(15px); border-bottom: 1px solid #e2e8f0;
             padding: 20px 0; z-index: 1000;
         }
-        .search-box {
+        .search-pill {
             background: #fff; border-radius: 50px; border: 1px solid #cbd5e1;
-            padding: 10px 25px; max-width: 800px; margin: 0 auto;
+            padding: 10px 25px; max-width: 700px; margin: 0 auto;
         }
-        .search-box input { border: none; outline: none; width: 100%; font-size: 1.1rem; }
+        .search-pill input { border: none; outline: none; width: 100%; font-size: 1.1rem; }
 
-        /* Level Pills */
-        .level-pill { cursor: pointer; padding: 6px 20px; border-radius: 50px; font-weight: 600; font-size: 0.8rem; transition: 0.3s; border: 1px solid #e2e8f0; background: white; }
-        .level-pill.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .level-btn { cursor: pointer; padding: 6px 18px; border-radius: 50px; font-size: 0.85rem; transition: 0.3s; border: 1px solid #e2e8f0; background: #fff; }
+        .level-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-        /* Format Cards */
         .res-card {
-            background: white; border-radius: 24px; padding: 25px; height: 100%;
-            border: 1px solid #f1f5f9; transition: 0.4s;
+            background: #fff; border-radius: 20px; padding: 25px; height: 100%;
+            border: 1px solid #f1f5f9; transition: 0.3s;
         }
-        .res-card:hover { transform: translateY(-10px); box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
+        .res-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
         
-        .icon-circle { width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 20px; }
-        .bg-pdf { background: #fee2e2; color: #ef4444; }
+        .icon-circle { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 15px; }
+        .bg-pdf { background: #fef2f2; color: #ef4444; }
         .bg-excel { background: #f0fdf4; color: #22c55e; }
-        .bg-web { background: #eff6ff; color: #3b82f6; }
-        .bg-video { background: #fff7ed; color: #f97316; }
+        .bg-doc { background: #eff6ff; color: #3b82f6; }
+        .bg-ppt { background: #fff7ed; color: #f97316; }
+        .bg-web { background: #f5f3ff; color: #7c3aed; }
     </style>
 </head>
 <body>
 
-<div class="search-bar-fixed">
+<div class="sticky-search shadow-sm">
     <div class="container text-center">
-        <h3 class="fw-bold mb-3">EduFlow Pro.</h3>
-        <div class="search-box d-flex align-items-center mb-3">
-            <i class="bi bi-search me-2 text-muted"></i>
-            <input type="text" id="qInput" placeholder="Search Python, Excel, Business...">
+        <h4 class="fw-bold mb-3">EduFlow Pro</h4>
+        <div class="search-pill d-flex align-items-center mb-3">
+            <i class="bi bi-search text-muted me-2"></i>
+            <input type="text" id="qInput" placeholder="Enter topic (e.g. 'Project Management')...">
         </div>
         <div class="d-flex justify-content-center gap-2">
-            <div class="level-pill active" onclick="setLevel(this, 'Beginner')">Beginner</div>
-            <div class="level-pill" onclick="setLevel(this, 'Intermediate')">Intermediate</div>
-            <div class="level-pill" onclick="setLevel(this, 'Expert')">Expert</div>
+            <button class="level-btn active" onclick="changeLevel(this, 'Beginner')">Beginner</button>
+            <button class="level-btn" onclick="changeLevel(this, 'Intermediate')">Intermediate</button>
+            <button class="level-btn" onclick="changeLevel(this, 'Expert')">Expert</button>
         </div>
     </div>
 </div>
@@ -62,28 +60,33 @@
 
 <script>
 let currentLevel = 'Beginner';
-const input = document.getElementById('qInput');
+const qInput = document.getElementById('qInput');
 const grid = document.getElementById('grid');
 
-function setLevel(el, level) {
-    document.querySelectorAll('.level-pill').forEach(p => p.classList.remove('active'));
-    el.classList.add('active');
+function changeLevel(btn, level) {
+    document.querySelectorAll('.level-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
     currentLevel = level;
-    if(input.value.length > 2) performSearch();
+    if(qInput.value.length > 2) startSearch();
 }
 
-input.addEventListener('input', () => {
-    if(input.value.length < 3) return;
+qInput.addEventListener('input', () => {
+    if(qInput.value.length < 3) return;
     clearTimeout(window.sTimer);
-    window.sTimer = setTimeout(performSearch, 800);
+    window.sTimer = setTimeout(startSearch, 700);
 });
 
-async function performSearch() {
-    grid.innerHTML = '<div class="col-12 text-center text-muted"><h4>Connecting to Global Repositories...</h4></div>';
-    const q = input.value.trim();
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&level=${currentLevel}`);
+async function startSearch() {
+    grid.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Retrieving multi-format resources...</p></div>';
+    
+    const res = await fetch(`/api/search?q=${encodeURIComponent(qInput.value)}&level=${currentLevel}`);
     const data = await res.json();
     
+    if(!data.length) {
+        grid.innerHTML = '<div class="col-12 text-center py-5"><h5>No resources found. Try a different topic.</h5></div>';
+        return;
+    }
+
     grid.innerHTML = data.map(item => `
         <div class="col-md-6 col-lg-4">
             <div class="res-card shadow-sm">
@@ -91,19 +94,20 @@ async function performSearch() {
                     <i class="bi ${getIcon(item.type)}"></i>
                 </div>
                 <h6 class="fw-bold mb-1">${item.title}</h6>
-                <div class="d-flex gap-2 mt-4">
-                    <span class="badge bg-light text-dark border">${item.type.toUpperCase()}</span>
-                    <span class="badge bg-indigo-100 text-indigo-700">${item.level}</span>
+                <div class="mt-3">
+                    <span class="badge bg-light text-dark border text-uppercase">${item.type}</span>
+                    <span class="badge bg-indigo-50 text-indigo-700">${item.level}</span>
                 </div>
-                <a href="${item.url}" target="_blank" class="btn btn-primary btn-sm rounded-pill w-100 mt-3">Open Resource</a>
+                <p class="small text-muted mt-2">${item.source}</p>
+                <a href="${item.url}" target="_blank" class="btn btn-primary btn-sm rounded-pill w-100 mt-2">View</a>
             </div>
         </div>
     `).join('');
 }
 
 function getIcon(type) {
-    const icons = {'pdf': 'bi-file-pdf', 'excel': 'bi-file-earmark-spreadsheet', 'web': 'bi-globe', 'video': 'bi-play-circle'};
-    return icons[type] || 'bi-journal-text';
+    const map = {'pdf': 'bi-file-pdf', 'excel': 'bi-file-earmark-excel', 'doc': 'bi-file-earmark-word', 'ppt': 'bi-file-earmark-ppt', 'web': 'bi-globe'};
+    return map[type] || 'bi-journal-text';
 }
 </script>
 </body>
