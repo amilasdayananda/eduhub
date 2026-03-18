@@ -1,49 +1,62 @@
 import requests
 from flask import Flask, render_template, request, jsonify
 from concurrent.futures import ThreadPoolExecutor
+from bs4 import BeautifulSoup
+import re
 
 app = Flask(__name__)
 
-def search_archive(query, level, filter_type):
-    """Searches for PDF, Excel, Word, and PPT."""
+def search_videos(query, level):
+    """Deep search for YouTube educational videos without an API key."""
     results = []
-    # If user selected a specific file type, we add it to the search
-    q = f"{query} {level}"
-    if filter_type and filter_type != 'all':
-        q += f" format:{filter_type}"
+    search_url = f"https://www.youtube.com/results?search_query={query}+{level}+tutorial"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
     
-    url = f"https://archive.org/advancedsearch.php?q={q}&fl[]=title,identifier,format&output=json&rows=20"
     try:
-        data = requests.get(url, timeout=5).json()
-        for item in data.get('response', {}).get('docs', []):
-            formats = str(item.get('format', '')).lower()
-            ftype = 'document'
-            if 'pdf' in formats: ftype = 'pdf'
-            elif 'excel' in formats or 'xls' in formats: ftype = 'excel'
-            elif 'word' in formats or 'doc' in formats: ftype = 'document'
-            elif 'powerpoint' in formats or 'ppt' in formats: ftype = 'ppt'
-            
+        response = requests.get(search_url, headers=headers, timeout=5)
+        # Using Regex to find video IDs in the raw HTML (Faster than BeautifulSoup for YT)
+        video_ids = re.findall(r"watch\?v=(\S{11})", response.text)
+        
+        for v_id in list(set(video_ids))[:10]:
             results.append({
-                "title": item.get('title', 'Resource'),
-                "url": f"https://archive.org/details/{item['identifier']}",
-                "type": ftype,
-                "level": level
+                "title": f"Video Tutorial: {query}",
+                "url": f"https://www.youtube.com/watch?v={v_id}",
+                "type": "video",
+                "level": level,
+                "source": "YouTube"
             })
     except: pass
     return results
 
-def search_web(query, level):
-    """Searches for Articles and Web Pages."""
+def search_files(query, level, f_type):
+    """Deep search for Excel, Docs, and PDFs using a direct indexer."""
     results = []
-    url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query} {level}&limit=10&format=json"
+    # If type is 'all', we search for everything. If specific, we target it.
+    target = f_type if f_type != 'all' else "(pdf OR xlsx OR docx OR pptx)"
+    search_query = f"{query} {level} filetype:{target}"
+    
+    # We use DuckDuckGo's Lite HTML for reliable, unblocked file discovery
+    url = f"https://html.duckduckgo.com/html/?q={search_query}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
     try:
-        data = requests.get(url, timeout=5).json()
-        for i in range(len(data[1])):
+        resp = requests.get(url, headers=headers, timeout=5)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        for link in soup.find_all('a', class_='result__a', limit=15):
+            href = link['href'].lower()
+            # Intelligent type detection
+            detected_type = 'web'
+            if '.pdf' in href: detected_type = 'pdf'
+            elif '.xls' in href or '.csv' in href: detected_type = 'excel'
+            elif '.doc' in href: detected_type = 'document'
+            elif '.ppt' in href: detected_type = 'ppt'
+
             results.append({
-                "title": data[1][i],
-                "url": data[3][i],
-                "type": "web",
-                "level": level
+                "title": link.text,
+                "url": link['href'],
+                "type": detected_type,
+                "level": level,
+                "source": "Global Index"
             })
     except: pass
     return results
@@ -52,19 +65,20 @@ def search_web(query, level):
 def api_search():
     query = request.args.get('q', '').strip()
     level = request.args.get('level', 'Beginner')
-    filter_type = request.args.get('type', 'all')
+    f_type = request.args.get('type', 'all')
     
     if not query: return jsonify([])
 
     with ThreadPoolExecutor() as executor:
-        f1 = executor.submit(search_archive, query, level, filter_type)
-        f2 = executor.submit(search_web, query, level)
+        # We search for videos and files in parallel
+        f1 = executor.submit(search_videos, query, level)
+        f2 = executor.submit(search_files, query, level, f_type)
         
         combined = f1.result() + f2.result()
     
-    # Final filter to ensure only requested type is shown
-    if filter_type != 'all':
-        combined = [r for r in combined if r['type'] == filter_type]
+    # Final filter for the UI
+    if f_type != 'all':
+        combined = [r for r in combined if r['type'] == f_type]
         
     return jsonify(combined)
 
