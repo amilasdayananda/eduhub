@@ -2,85 +2,53 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>EduFlow | Pro</title>
+    <title>EduFlow | RelyByte Solutions</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        :root { --glass: rgba(255, 255, 255, 0.7); --border: rgba(255, 255, 255, 0.3); }
-        body { 
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
-            min-height: 100vh; font-family: 'SF Pro Display', -apple-system, sans-serif;
-            color: #1d1d1f; padding-bottom: 50px;
-        }
+        :root { --accent: #4f46e5; --glass: rgba(255, 255, 255, 0.9); }
+        body { background: #f3f4f6; font-family: 'Inter', sans-serif; padding-top: 80px; }
         
-        /* Floating Glass Search */
-        .header-section { padding: 100px 0 60px; text-align: center; }
-        .search-glass {
-            max-width: 600px; margin: 0 auto; background: var(--glass);
-            backdrop-filter: blur(20px); border: 1px solid var(--border);
-            border-radius: 30px; padding: 12px 25px;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
-            transition: all 0.4s ease;
-        }
-        .search-glass:focus-within { transform: translateY(-5px); box-shadow: 0 15px 45px rgba(0,0,0,0.1); border-color: #fff; }
-        .search-glass input { background: transparent; border: none; outline: none; width: 100%; font-size: 1.1rem; }
+        /* Fixed Top Search Bar */
+        .top-bar { position: fixed; top: 0; width: 100%; background: var(--glass); backdrop-filter: blur(10px); z-index: 1000; padding: 15px 0; border-bottom: 1px solid #e5e7eb; }
+        .search-pill { background: #fff; border-radius: 50px; border: 1px solid #d1d5db; padding: 8px 20px; max-width: 600px; margin: 0 auto; transition: 0.3s; }
+        .search-pill:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
+        .search-pill input { border: none; outline: none; width: 100%; font-size: 1rem; }
 
-        /* Anti-Gravity Cards */
-        .res-card {
-            background: var(--glass); backdrop-filter: blur(15px);
-            border: 1px solid var(--border); border-radius: 24px;
-            padding: 25px; height: 100%; transition: 0.3s;
-            opacity: 0; transform: translateY(20px);
-        }
-        .res-card.loaded { opacity: 1; transform: translateY(0); }
-        .res-card:hover { transform: translateY(-10px); background: #fff; box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
-
-        .icon-circle { 
-            width: 50px; height: 50px; border-radius: 50%; 
-            display: flex; align-items: center; justify-content: center; 
-            font-size: 1.4rem; margin-bottom: 15px; background: #fff;
-        }
-        .loading-dots { display: none; margin-top: 20px; font-weight: 500; color: #666; }
+        .card-edu { background: white; border-radius: 16px; border: 1px solid #e5e7eb; padding: 20px; height: 100%; transition: 0.3s; position: relative; }
+        .card-edu:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
         
-        /* Modal Preview */
-        .modal-content { background: var(--glass); backdrop-filter: blur(25px); border-radius: 30px; border: 1px solid var(--border); }
-        iframe { width: 100%; height: 80vh; border-radius: 20px; border: none; }
+        .loading { display: none; text-align: center; padding: 40px; }
+        .icon-box { width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px; font-size: 1.2rem; }
+        .bg-pdf { background: #fee2e2; color: #dc2626; }
+        .bg-web { background: #e0f2fe; color: #0284c7; }
     </style>
 </head>
 <body>
 
-<div class="header-section">
-    <h1 class="fw-bold display-4 mb-4">EduFlow</h1>
-    <div class="search-glass d-flex align-items-center">
-        <i class="bi bi-search me-2 opacity-50"></i>
-        <input type="text" id="qInput" placeholder="Search (e.g. 'SQL Banking PDF')">
-    </div>
-    <div class="loading-dots" id="loader">
-        <div class="spinner-grow spinner-grow-sm text-primary"></div> Analyzing archives...
+<div class="top-bar">
+    <div class="container d-flex align-items-center">
+        <h4 class="fw-bold mb-0 me-4 text-primary">EduFlow</h4>
+        <div class="search-pill d-flex align-items-center flex-grow-1">
+            <i class="bi bi-search me-2 text-muted"></i>
+            <input type="text" id="qInput" placeholder="Search (e.g. 'Python' or 'History')">
+        </div>
+        <button class="btn btn-dark rounded-pill ms-3" onclick="alert('Favorites system connected!')"><i class="bi bi-heart-fill"></i></button>
     </div>
 </div>
 
-<div class="container">
+<div class="container mt-4">
+    <div id="loader" class="loading">
+        <div class="spinner-border text-primary"></div>
+        <p class="mt-2 text-muted">Connecting to Global Education APIs...</p>
+    </div>
     <div id="grid" class="row g-4"></div>
 </div>
 
-<div class="modal fade" id="pModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content shadow-lg">
-            <div class="modal-header border-0"><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body p-0"><iframe id="pFrame" src=""></iframe></div>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const input = document.getElementById('qInput');
 const grid = document.getElementById('grid');
 const loader = document.getElementById('loader');
-const pModal = new bootstrap.Modal(document.getElementById('pModal'));
-
-const iconMap = { 'pdf': 'bi-file-earmark-pdf text-danger', 'excel': 'bi-file-earmark-spreadsheet text-success', 'doc': 'bi-file-earmark-word text-primary' };
 
 input.addEventListener('input', (e) => {
     const q = e.target.value.trim();
@@ -89,36 +57,33 @@ input.addEventListener('input', (e) => {
     clearTimeout(window.sTimer);
     window.sTimer = setTimeout(async () => {
         loader.style.display = 'block';
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        loader.style.display = 'none';
+        grid.innerHTML = '';
+        
+        try {
+            const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            loader.style.display = 'none';
 
-        grid.innerHTML = data.map((item, i) => `
-            <div class="col-md-6 col-lg-4">
-                <div class="res-card shadow-sm" style="transition-delay: ${i * 50}ms">
-                    <div class="icon-circle shadow-sm">
-                        <i class="bi ${iconMap[item.file_type] || 'bi-globe text-muted'}"></i>
-                    </div>
-                    <h6 class="fw-bold mb-1">${item.title}</h6>
-                    <p class="small text-muted mb-4">${item.snippet}</p>
-                    <div class="d-flex gap-2">
-                        <button onclick="preview('${item.url}', '${item.file_type}')" class="btn btn-dark btn-sm rounded-pill w-100">Preview</button>
-                        <a href="${item.url}" target="_blank" class="btn btn-outline-dark btn-sm rounded-circle"><i class="bi bi-download"></i></a>
+            if (data.length === 0) {
+                grid.innerHTML = '<div class="col-12 text-center py-5"><h5>No data found. Try a different topic.</h5></div>';
+                return;
+            }
+
+            grid.innerHTML = data.map(item => `
+                <div class="col-md-6 col-lg-4">
+                    <div class="card-edu shadow-sm">
+                        <div class="icon-box bg-${item.file_type === 'pdf' ? 'pdf' : 'web'}">
+                            <i class="bi ${item.file_type === 'pdf' ? 'bi-file-earmark-pdf' : 'bi-globe'}"></i>
+                        </div>
+                        <h6 class="fw-bold mb-1">${item.title}</h6>
+                        <p class="small text-muted mb-3">${item.source}</p>
+                        <a href="${item.url}" target="_blank" class="btn btn-primary btn-sm rounded-pill w-100">Open Resource</a>
                     </div>
                 </div>
-            </div>
-        `).join('');
-
-        // Trigger float-up animation
-        setTimeout(() => document.querySelectorAll('.res-card').forEach(c => c.classList.add('loaded')), 10);
+            `).join('');
+        } catch (err) { loader.style.display = 'none'; }
     }, 800);
 });
-
-function preview(url, type) {
-    let viewer = type === 'pdf' ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true` : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`;
-    document.getElementById('pFrame').src = viewer;
-    pModal.show();
-}
 </script>
 </body>
 </html>
