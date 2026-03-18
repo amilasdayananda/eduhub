@@ -6,57 +6,63 @@ import re
 
 app = Flask(__name__)
 
-def search_videos(query, level):
-    """Deep search for YouTube educational videos without an API key."""
+def search_files(query, level, f_type):
+    """Specifically hunts for direct file links (Excel, Word, PDF)."""
     results = []
-    search_url = f"https://www.youtube.com/results?search_query={query}+{level}+tutorial"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+    
+    # Mapping for targeted 'Dorks'
+    type_map = {
+        'pdf': 'filetype:pdf',
+        'excel': '(filetype:xlsx OR filetype:xls)',
+        'document': '(filetype:docx OR filetype:doc)',
+        'all': '(filetype:pdf OR filetype:xlsx OR filetype:docx)'
+    }
+    
+    # We use DuckDuckGo HTML which is excellent for finding direct files
+    target_ext = type_map.get(f_type, type_map['all'])
+    search_query = f"{query} {level} {target_ext}"
+    url = f"https://html.duckduckgo.com/html/?q={search_query}"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
     
     try:
-        response = requests.get(search_url, headers=headers, timeout=5)
-        # Using Regex to find video IDs in the raw HTML (Faster than BeautifulSoup for YT)
-        video_ids = re.findall(r"watch\?v=(\S{11})", response.text)
+        resp = requests.get(url, headers=headers, timeout=7)
+        soup = BeautifulSoup(resp.text, 'html.parser')
         
-        for v_id in list(set(video_ids))[:10]:
+        for link in soup.find_all('a', class_='result__a', limit=20):
+            href = link['href'].lower()
+            
+            # Strict File Type Detection
+            detected = 'web'
+            if '.pdf' in href: detected = 'pdf'
+            elif any(x in href for x in ['.xls', '.xlsx', '.csv']): detected = 'excel'
+            elif any(x in href for x in ['.doc', '.docx', '.rtf']): detected = 'document'
+            
+            # Only add if it's a file or we are in 'all' mode
+            if f_type == 'all' or detected == f_type:
+                results.append({
+                    "title": link.text.strip(),
+                    "url": link['href'],
+                    "type": detected,
+                    "level": level,
+                    "source": "Global File Index"
+                })
+    except: pass
+    return results
+
+def search_videos(query, level):
+    """Educational video search."""
+    results = []
+    url = f"https://www.youtube.com/results?search_query={query}+{level}+tutorial"
+    try:
+        resp = requests.get(url, timeout=5)
+        v_ids = re.findall(r"watch\?v=(\S{11})", resp.text)
+        for v_id in list(set(v_ids))[:8]:
             results.append({
-                "title": f"Video Tutorial: {query}",
+                "title": f"Video: {query} ({level})",
                 "url": f"https://www.youtube.com/watch?v={v_id}",
                 "type": "video",
                 "level": level,
                 "source": "YouTube"
-            })
-    except: pass
-    return results
-
-def search_files(query, level, f_type):
-    """Deep search for Excel, Docs, and PDFs using a direct indexer."""
-    results = []
-    # If type is 'all', we search for everything. If specific, we target it.
-    target = f_type if f_type != 'all' else "(pdf OR xlsx OR docx OR pptx)"
-    search_query = f"{query} {level} filetype:{target}"
-    
-    # We use DuckDuckGo's Lite HTML for reliable, unblocked file discovery
-    url = f"https://html.duckduckgo.com/html/?q={search_query}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    
-    try:
-        resp = requests.get(url, headers=headers, timeout=5)
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        for link in soup.find_all('a', class_='result__a', limit=15):
-            href = link['href'].lower()
-            # Intelligent type detection
-            detected_type = 'web'
-            if '.pdf' in href: detected_type = 'pdf'
-            elif '.xls' in href or '.csv' in href: detected_type = 'excel'
-            elif '.doc' in href: detected_type = 'document'
-            elif '.ppt' in href: detected_type = 'ppt'
-
-            results.append({
-                "title": link.text,
-                "url": link['href'],
-                "type": detected_type,
-                "level": level,
-                "source": "Global Index"
             })
     except: pass
     return results
@@ -70,17 +76,19 @@ def api_search():
     if not query: return jsonify([])
 
     with ThreadPoolExecutor() as executor:
-        # We search for videos and files in parallel
-        f1 = executor.submit(search_videos, query, level)
-        f2 = executor.submit(search_files, query, level, f_type)
-        
-        combined = f1.result() + f2.result()
-    
-    # Final filter for the UI
-    if f_type != 'all':
-        combined = [r for r in combined if r['type'] == f_type]
-        
-    return jsonify(combined)
+        # If user asks for videos, we search videos. Otherwise, we focus on files.
+        if f_type == 'video':
+            data = search_videos(query, level)
+        elif f_type == 'all':
+            # In 'All' mode, we combine both
+            f1 = executor.submit(search_files, query, level, 'all')
+            f2 = executor.submit(search_videos, query, level)
+            data = f1.result() + f2.result()
+        else:
+            # Targeted file search (Excel/Docs/PDF)
+            data = search_files(query, level, f_type)
+            
+    return jsonify(data)
 
 @app.route('/')
 def index():
