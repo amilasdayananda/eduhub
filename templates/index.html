@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>EduFlow | Global Meta-Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .search-hero { background: white; padding: 60px 0; border-bottom: 1px solid #e2e8f0; text-align: center; }
+        .search-pill { max-width: 600px; margin: -30px auto 0; background: white; border-radius: 50px; padding: 12px 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #ddd; }
+        .search-pill input { border: none; outline: none; width: 100%; font-size: 1.1rem; }
+        
+        /* Modal for All Formats */
+        .modal-xl { max-width: 95%; }
+        iframe { width: 100%; height: 85vh; border: none; border-radius: 12px; }
+        
+        .res-card { background: white; border-radius: 20px; border: 1px solid #eee; padding: 20px; height: 100%; transition: 0.3s; }
+        .res-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        
+        /* File Type Colors */
+        .color-pdf { color: #e11d48; }
+        .color-excel { color: #16a34a; }
+        .color-doc { color: #2563eb; }
+        .color-ppt { color: #ea580c; }
+    </style>
+</head>
+<body>
+
+<div class="search-hero">
+    <h1 class="fw-bold">EduFlow.</h1>
+    <p class="text-muted">Analyzing global archives for PDF, Excel, Word & More.</p>
+</div>
+
+<div class="container">
+    <div class="search-pill d-flex align-items-center">
+        <i class="bi bi-search me-2 text-muted"></i>
+        <input type="text" id="qInput" placeholder="Search (e.g. 'Accounting Excel' or 'Python PDF')">
+    </div>
+
+    <div id="grid" class="row g-4 mt-5"></div>
+</div>
+
+<div class="modal fade" id="vModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header"><h6 class="modal-title fw-bold" id="vTitle"></h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-0"><iframe id="vFrame" src=""></iframe></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const input = document.getElementById('qInput');
+const grid = document.getElementById('grid');
+const vModal = new bootstrap.Modal(document.getElementById('vModal'));
+
+const iconMap = {
+    'pdf': 'bi-file-pdf-fill color-pdf',
+    'excel': 'bi-file-earmark-excel-fill color-excel',
+    'doc': 'bi-file-earmark-word-fill color-doc',
+    'powerpoint': 'bi-file-earmark-slides-fill color-ppt'
+};
+
+input.addEventListener('input', async (e) => {
+    const q = e.target.value.trim();
+    if (q.length < 3) return;
+
+    // We use your established search logic from app.py here...
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+
+    grid.innerHTML = data.map(item => `
+        <div class="col-md-6 col-lg-4">
+            <div class="res-card shadow-sm">
+                <i class="bi ${iconMap[item.file_type] || 'bi-file-earmark'} fs-2 mb-2 d-block"></i>
+                <h6 class="fw-bold mb-1">${item.title}</h6>
+                <p class="small text-muted mb-4">${item.source}</p>
+                <div class="d-flex gap-2">
+                    <button onclick="preview('${item.url}', '${item.file_type}', '${item.title.replace(/'/g, "")}')" class="btn btn-primary btn-sm rounded-pill w-100">Quick Preview</button>
+                    <a href="${item.url}" target="_blank" class="btn btn-outline-secondary btn-sm rounded-circle"><i class="bi bi-download"></i></a>
+                </div>
+            </div>
+        </div>
+    `).join('');
+});
+
+function preview(url, type, title) {
+    document.getElementById('vTitle').innerText = title;
+    let viewerUrl = "";
+    
+    // Logic for Universal Viewing
+    if (type === 'pdf') {
+        viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+    } else {
+        // Office Online handles .docx, .xlsx, .pptx
+        viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`;
+    }
+    
+    document.getElementById('vFrame').src = viewerUrl;
+    vModal.show();
+}
+</script>
+</body>
+</html>
