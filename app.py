@@ -4,49 +4,38 @@ from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
-def get_archive_materials(query, level):
-    """
-    Searches Archive.org specifically for Office and PDF formats.
-    """
+def search_archive(query, level, filter_type):
+    """Searches for PDF, Excel, Word, and PPT."""
     results = []
-    # Refine query based on student level
-    search_term = f"{query} {level}"
+    # If user selected a specific file type, we add it to the search
+    q = f"{query} {level}"
+    if filter_type and filter_type != 'all':
+        q += f" format:{filter_type}"
     
-    # We ask for specific formats in the Archive.org query
-    url = f"https://archive.org/advancedsearch.php?q={search_term}&fl[]=title,identifier,format&output=json&rows=15"
-    
+    url = f"https://archive.org/advancedsearch.php?q={q}&fl[]=title,identifier,format&output=json&rows=20"
     try:
-        response = requests.get(url, timeout=5).json()
-        docs = response.get('response', {}).get('docs', [])
-        
-        for item in docs:
-            # Archive stores multiple formats in a list or string
+        data = requests.get(url, timeout=5).json()
+        for item in data.get('response', {}).get('docs', []):
             formats = str(item.get('format', '')).lower()
-            
-            # Map formats to our dashboard icons
-            ftype = 'web'
+            ftype = 'document'
             if 'pdf' in formats: ftype = 'pdf'
-            elif 'excel' in formats or 'xlsx' in formats: ftype = 'excel'
-            elif 'word' in formats or 'docx' in formats: ftype = 'doc'
-            elif 'powerpoint' in formats or 'pptx' in formats: ftype = 'ppt'
-
+            elif 'excel' in formats or 'xls' in formats: ftype = 'excel'
+            elif 'word' in formats or 'doc' in formats: ftype = 'document'
+            elif 'powerpoint' in formats or 'ppt' in formats: ftype = 'ppt'
+            
             results.append({
-                "title": item.get('title', 'Educational Resource'),
+                "title": item.get('title', 'Resource'),
                 "url": f"https://archive.org/details/{item['identifier']}",
                 "type": ftype,
-                "level": level,
-                "source": "Internet Archive"
+                "level": level
             })
-    except:
-        pass
+    except: pass
     return results
 
-def get_web_articles(query, level):
-    """
-    Fetches high-quality web pages from Wikipedia.
-    """
+def search_web(query, level):
+    """Searches for Articles and Web Pages."""
     results = []
-    url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query} {level}&limit=5&format=json"
+    url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query} {level}&limit=10&format=json"
     try:
         data = requests.get(url, timeout=5).json()
         for i in range(len(data[1])):
@@ -54,27 +43,29 @@ def get_web_articles(query, level):
                 "title": data[1][i],
                 "url": data[3][i],
                 "type": "web",
-                "level": level,
-                "source": "Wikipedia"
+                "level": level
             })
-    except:
-        pass
+    except: pass
     return results
 
 @app.route('/api/search')
 def api_search():
     query = request.args.get('q', '').strip()
     level = request.args.get('level', 'Beginner')
+    filter_type = request.args.get('type', 'all')
+    
     if not query: return jsonify([])
 
-    # Run searches in parallel for "Anti-Gravity" speed
     with ThreadPoolExecutor() as executor:
-        f1 = executor.submit(get_archive_materials, query, level)
-        f2 = executor.submit(get_web_articles, query, level)
+        f1 = executor.submit(search_archive, query, level, filter_type)
+        f2 = executor.submit(search_web, query, level)
         
-        # Combine everything
         combined = f1.result() + f2.result()
     
+    # Final filter to ensure only requested type is shown
+    if filter_type != 'all':
+        combined = [r for r in combined if r['type'] == filter_type]
+        
     return jsonify(combined)
 
 @app.route('/')
